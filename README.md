@@ -37,7 +37,7 @@ pip install -r requirements.txt
 
 ## 3. Quick-Start Demo (Out-of-the-Box)
 
-Two anonymized public test cases (`sample1`, [$^{18}$F]F-PSMA; `sample2`, [$^{68}$Ga]Ga-PSMA) from **The Cancer Imaging Archive (TCIA) PSMA-PET-CT-Lesions** collection are included in `./demo_data/TCIA_sample/` for immediate verification of inference and quantitative evaluation:
+Two anonymized public test cases (`sample1`, <sup>18</sup>F-PSMA; `sample2`, <sup>68</sup>Ga-PSMA) from **The Cancer Imaging Archive (TCIA) PSMA-PET-CT-Lesions** collection are included in `./demo_data/TCIA_sample/` for immediate verification of inference and quantitative evaluation:
 
 ```bash
 # 1. Run sliding-window inference with the released checkpoint
@@ -75,13 +75,13 @@ data/
 
 ![Sample Data and Mask Overview](./assets/data_mask_overview.png)
 
-*Figure: Representative axial slices from the two included anonymized public TCIA demo cases (`sample1`, $^{18}$F-PSMA; `sample2`, $^{68}$Ga-PSMA). **(A)** Input PSMA PET (`*_PET.nii.gz`, SUV 0–5); **(B)** Registered CT (`*_CT.nii.gz`); **(C)** `*_MERGED_MASK.nii.gz` overlaid on CT, showing ground-truth tumour (`label = 1`, red, priority overwrite without dilation) and non-tumour pelvic organs/bones (`label >= 2`, including urinary bladder and pelvic bones with prostate excluded, teal); **(D)** Ground-truth tumour contour (`label == 1`, solid green) compared against single-model `lsa_resunet_finetuned.pth` prediction (`*_PET_seg.nii.gz`, dashed red).*
+*Representative axial slices from the two anonymized TCIA demo cases (`sample1`, <sup>18</sup>F-PSMA; `sample2`, <sup>68</sup>Ga-PSMA). **(A)** PSMA PET; **(B)** Registered CT; **(C)** Merged organ and tumour mask; **(D)** Ground-truth vs. single-model prediction (`3D DSC` computed over the full volume).*
 
 ### Mask & Augmentation Details
 * **Organ & Tumour Mask Merging (`MERGED_MASK`)**:
   * Organ masks (`OM`) are derived from CT using [TotalSegmentator](https://github.com/wasserth/TotalSegmentator), with the **prostate mask excluded** during preprocessing.
   * Ground-truth tumour masks (`TM`, `label == 1`) take priority over overlapping pelvic organs (including the urinary bladder, `label == 2`, and pelvic bones/structures, `label > 2`), overwriting overlapping voxels **directly voxel-by-voxel without morphological dilation**.
-  * During fine-tuning, `RandCropByPosNegLabeld` samples $32^3$ patches using `MERGED_MASK > 0` as foreground, while the loss and validation metrics evaluate strictly on `seg == 1` (tumour).
+  * During fine-tuning, `RandCropByPosNegLabeld` samples `32×32×32` patches using `MERGED_MASK > 0` as foreground, while the loss and validation metrics evaluate strictly on `seg == 1` (tumour).
 * **Organ CutMix (`finetune.py`)**:
   * Applied via MONAI `CutMixd(keys=["img"], batch_size=64, alpha=0.3)` exclusively to the **PET** patches sampled using `MERGED_MASK`, while keeping paired **CT** volumes and **tumour masks (`seg`)** unaltered.
 * **Seed Control**:
@@ -146,25 +146,14 @@ python evaluation.py \
   --output_csv ./outputs/evaluation_metrics_tcia.csv
 ```
 * **Evaluation Criteria & Exported CSV (21 Columns)**:
-  * **Lesion Counts & Matrix**: `Scan_ID`, `Pred_Lesions`, `GT_Lesions`, `Lesion_TP`, `Lesion_FP`, `Lesion_FN` (3D 6-connected components; a lesion is a true positive if overlap $\ge 10\%$ of the GT lesion volume **and** the predicted lesion covers the GT lesion's $\text{SUV}_{\max}$ peak voxel).
+  * **Lesion Counts & Matrix**: `Scan_ID`, `Pred_Lesions`, `GT_Lesions`, `Lesion_TP`, `Lesion_FP`, `Lesion_FN` (3D 6-connected components; a lesion is a true positive if overlap ≥ 10% of the GT lesion volume **and** the predicted lesion covers the GT lesion's SUV<sub>max</sub> peak voxel).
   * **Voxel-Level Metrics**: `DSC`, `Voxel_PPV`, `Voxel_Sensitivity`.
   * **Lesion-Level Metrics**: `Lesion_PPV`, `Lesion_Sensitivity`.
   * **PET Quantitative Biomarkers & Errors**: `Pred_SUVmean`, `GT_SUVmean`, `Pred_SUVmax`, `GT_SUVmax`, `Pred_PSMA_TV_ml`, `GT_PSMA_TV_ml`, `Pred_TL_PSMA`, `GT_TL_PSMA`, `ARVM_Absolute_Relative_Volume_Metric`, `SUVmean_Signed_Relative_Error`.
 
 ---
 
-## 6. Released Checkpoint & Benchmark Results
-
-This repository releases a representative single-model checkpoint (`./weights/lsa_resunet_finetuned.pth`, ~19 MB). Note that for fair comparison against 5-fold `nnU-Net` in Table 5 of the paper, 5-fold cross-validation probability averaging was evaluated:
-
-| Configuration | Checkpoint | Internal FAHSU-PSMA (n=12) DSC | External TCIA (n=52) DSC |
-| :--- | :--- | :---: | :---: |
-| **LSA-ResUNet (Single Model, Released)** | `weights/lsa_resunet_finetuned.pth` | 0.790 | 0.681 |
-| **LSA-ResUNet (5-Fold Ensemble, Paper Table 5)** | 5-fold CV ensemble | **0.795** | **0.691** |
-
----
-
-## 7. Data Availability & License
+## 6. Data Availability & License
 
 * **Code License**: Released under the [Apache-2.0 License](./LICENSE).
 * **Public Datasets**:
