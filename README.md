@@ -22,7 +22,7 @@ LSA-ResUNet/
 ├── assets/
 │   └── data_mask_overview.png    # Visual overview of sample PET/CT, MERGED_MASK, and predictions
 ├── weights/
-│   └── lsa_resunet_finetuned.pth # Fine-tuned LSA-ResUNet checkpoint (~19 MB)
+│   └── best_metric_model_segmentation3d_dict.pth  # Fine-tuned LSA-ResUNet checkpoint
 └── demo_data/
     └── TCIA_sample/              # 2 public sample cases from TCIA PSMA-PET-CT-Lesions
 ```
@@ -45,7 +45,7 @@ Two public test cases, `sample1` with <sup>18</sup>F-PSMA and `sample2` with <su
 
 ```bash
 # 1. Run sliding-window inference with the released checkpoint
-python inference.py --data_dir ./demo_data/TCIA_sample --weights ./weights/lsa_resunet_finetuned.pth --output_dir ./outputs/demo_preds
+python inference.py --data_dir ./demo_data/TCIA_sample --weights ./weights/best_metric_model_segmentation3d_dict.pth --output_dir ./outputs/demo_preds
 
 # 2. Compute voxel-level, lesion-level, and PET quantitative biomarkers
 python evaluation.py --pred_dir ./outputs/demo_preds --gt_dir ./demo_data/TCIA_sample --output_csv ./outputs/demo_metrics.csv
@@ -100,6 +100,22 @@ python preprocessing/2_crop_vesicoprostatic_roi.py --input_dir ./step1_downsampl
 python preprocessing/3_merge_organ_tumor_mask.py --input_dir ./step2_cropped --output_dir ./data/dataset/train
 ```
 
+**Preprocessing Outputs** saved in `--output_dir`, e.g., `./data/dataset/train/`:
+
+```text
+data/dataset/train/
+├── <case_id>_PET.nii.gz          # Cropped SUVbw PET at native resolution
+├── <case_id>_CT.nii.gz           # Downsampled, [-1000, 1000] HU clipped, and cropped CT
+└── <case_id>_MERGED_MASK.nii.gz  # Merged mask (present when TTB.nii.gz is provided)
+```
+
+Example console output after running Step 3:
+
+```text
+[OK] sample1: exported PET, CT, and MERGED_MASK (prostate=22 excluded)
+Step 3 complete: 1/1 case(s) exported to ./data/dataset/train
+```
+
 **Mask & Split Conventions**:
 
 In `MERGED_MASK`, `label == 0` denotes background and the excluded prostate region, `label == 1` denotes the ground-truth tumour overwriting overlapping organs directly voxel-by-voxel without morphological dilation, and `label > 1` retains the remaining pelvic organs and bones.
@@ -121,7 +137,7 @@ data/
 
 ![Sample Data and Mask Overview](./assets/data_mask_overview.png)
 
-*Representative axial slices from the two TCIA demo cases, `sample1` with <sup>18</sup>F-PSMA and `sample2` with <sup>68</sup>Ga-PSMA. **(A)** PSMA PET; **(B)** Registered CT; **(C)** Merged organ and tumour mask; **(D)** Ground-truth vs. single-model prediction, with `3D DSC` computed over the full volume.*
+*Representative axial slices from the two TCIA demo cases, `sample1` with <sup>18</sup>F-PSMA and `sample2` with <sup>68</sup>Ga-PSMA. **(A)** PSMA PET; **(B)** Registered CT; **(C)** Merged organ and tumour mask; **(D)** Ground-truth vs. single-model `best_metric_model_segmentation3d_dict.pth` prediction, with `3D DSC` computed over the full volume.*
 
 ---
 
@@ -163,7 +179,7 @@ Optional flags: `--aug_mode fixed --seed <N>` or `--aug_mode random` for fixed o
 
 ```bash
 # Single checkpoint inference
-python inference.py --data_dir ./data/finetune_data/test --weights ./weights/lsa_resunet_finetuned.pth --output_dir ./outputs/preds
+python inference.py --data_dir ./data/finetune_data/test --weights ./weights/best_metric_model_segmentation3d_dict.pth --output_dir ./outputs/preds
 
 # Multi-fold ensemble inference (averages sigmoid probabilities across checkpoints)
 python inference.py --data_dir ./data/finetune_data/test --weights ./outputs/fold0.pth ./outputs/fold1.pth ./outputs/fold2.pth ./outputs/fold3.pth ./outputs/fold4.pth --output_dir ./outputs/preds_ensemble
@@ -195,7 +211,9 @@ python evaluation.py --pred_dir ./outputs/preds --gt_dir ./data/ground_truth --p
 
 ---
 
-## 6. Data Availability & License
+## 6. Released Checkpoint & Data Availability
+
+**Released Checkpoint**: `./weights/best_metric_model_segmentation3d_dict.pth` was obtained by supervised pretraining of `LSAResUNet` on DEEP-PSMA, followed by fine-tuning on FAHSU-PSMA using PET Organ CutMix and `DiceFocalLoss`, retaining the checkpoint with the highest validation DSC.
 
 **Code License**: Released under the [Apache-2.0 License](./LICENSE).
 
