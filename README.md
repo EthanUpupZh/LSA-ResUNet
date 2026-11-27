@@ -37,7 +37,7 @@ pip install -r requirements.txt
 
 ## 3. Quick-Start Demo (Out-of-the-Box)
 
-Two public test cases (`sample1`, <sup>18</sup>F-PSMA; `sample2`, <sup>68</sup>Ga-PSMA) from **The Cancer Imaging Archive (TCIA) PSMA-PET-CT-Lesions** collection are included in `./demo_data/TCIA_sample/` for immediate verification of inference and quantitative evaluation:
+Two public test cases, `sample1` with <sup>18</sup>F-PSMA and `sample2` with <sup>68</sup>Ga-PSMA, from the **TCIA PSMA-PET-CT-Lesions** collection are included in `./demo_data/TCIA_sample/` for immediate verification of inference and quantitative evaluation:
 
 ```bash
 # 1. Run sliding-window inference with the released checkpoint
