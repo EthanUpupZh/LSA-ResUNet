@@ -97,13 +97,13 @@ python preprocessing/1_resample_and_clip_ct.py --input_dir ./raw_data --output_d
 python preprocessing/2_crop_vesicoprostatic_roi.py --input_dir ./step1_downsampled --output_dir ./step2_cropped
 
 # Step 3: Exclude prostate mask (label 22), merge tumour mask, and save as <case_id>_*.nii.gz
-python preprocessing/3_merge_organ_tumor_mask.py --input_dir ./step2_cropped --output_dir ./data/dataset/train
+python preprocessing/3_merge_organ_tumor_mask.py --input_dir ./step2_cropped --output_dir ./data/finetune_data/train
 ```
 
-**Preprocessing Outputs** saved in `--output_dir`, e.g., `./data/dataset/train/`:
+**Preprocessing Outputs** saved in `--output_dir`, e.g., `./data/finetune_data/train/`:
 
 ```text
-data/dataset/train/
+data/finetune_data/train/
 ├── <case_id>_PET.nii.gz          # Cropped SUVbw PET at native resolution
 ├── <case_id>_CT.nii.gz           # Downsampled, [-1000, 1000] HU clipped, and cropped CT
 └── <case_id>_MERGED_MASK.nii.gz  # Merged mask (present when TTB.nii.gz is provided)
@@ -113,7 +113,7 @@ Example console output after running Step 3:
 
 ```text
 [OK] sample1: exported PET, CT, and MERGED_MASK (prostate=22 excluded)
-Step 3 complete: 1/1 case(s) exported to ./data/dataset/train
+Step 3 complete: 1/1 case(s) exported to ./data/finetune_data/train
 ```
 
 **Mask & Split Conventions**:
@@ -165,7 +165,7 @@ python pretrain.py --data_dir ./data/pretrain_data --output_dir ./outputs/pretra
 python finetune.py --data_dir ./data/finetune_data --pretrained_path ./outputs/pretrain/best_model_segmentation3d.pth --output_dir ./outputs/finetune
 ```
 
-**Default Parameters**: When no extra arguments are specified, `finetune.py` runs with the exact hyperparameters reported in the paper — `epochs = 400`, `val_interval = 2`, `batch_size = 2`, `num_samples = 32`, `lr = 1e-3`, and `aug_mode = fixed`, while also supporting `random` seed mode. All parameters can be adjusted directly in `finetune.py` or via command-line arguments according to your own dataset characteristics.
+**Default Parameters**: When no extra arguments are specified, `finetune.py` runs with the exact hyperparameters reported in the paper — `epochs = 400`, `val_interval = 2`, `batch_size = 2`, `num_samples = 32`, `lr = 1e-3`, and `aug_mode = fixed`, while also supporting `random` seed mode. Passing an invalid `--pretrained_path` raises an error; pass `--pretrained_path none` to train from scratch. All parameters can be adjusted directly in `finetune.py` or via command-line arguments according to your own dataset characteristics.
 
 **Outputs** saved in `./outputs/finetune/`:
 
@@ -197,7 +197,7 @@ python evaluation.py --pred_dir ./outputs/preds --gt_dir ./data/finetune_data/te
 python evaluation.py --pred_dir ./outputs/preds --gt_dir ./data/ground_truth --pet_dir ./data/pet_images --output_csv ./outputs/evaluation_metrics.csv
 ```
 
-**Outputs**: Prints per-case and cohort summary statistics — Mean ± SD, Range, Median and IQR — to the terminal and saves the 21-column CSV table to `--output_csv`, e.g., `./outputs/evaluation_metrics.csv`.
+**Outputs**: Prints per-case and cohort summary statistics — Mean ± SD, Range, Median and IQR — to the terminal and saves the 21-column CSV table to `--output_csv`, e.g., `./outputs/evaluation_metrics.csv`. Case IDs are matched by full `<case_id>` prefix before `_PET_seg.nii.gz`, supporting IDs with underscores such as `patient001_01`.
 
 **Evaluation Criteria & Exported CSV — 21 Columns**:
 

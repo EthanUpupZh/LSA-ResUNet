@@ -85,6 +85,14 @@ def compute_pet_quantitative_parameters(pet_array, mask_array, spacing):
     return suv_mean, suv_max, psma_tv, tl_psma
 
 
+def extract_case_id(filename: str) -> str:
+    """Extract case ID by stripping known prediction NIfTI suffixes."""
+    for suffix in ("_PET_seg.nii.gz", "_seg.nii.gz", "_PET.nii.gz", ".nii.gz"):
+        if filename.endswith(suffix):
+            return filename[: -len(suffix)]
+    return Path(filename).stem
+
+
 def find_matching_file(target_dir: Path, base_id: str, role: str):
     if role == "pet":
         suffixes = ("_PET.nii.gz", ".nii.gz")
@@ -133,8 +141,7 @@ def main(args):
     eps = 1e-7
 
     for pred_file in pred_files:
-        file_stem = pred_file.name[:-7] if pred_file.name.endswith(".nii.gz") else pred_file.stem
-        patient_id = file_stem.split("_")[0]
+        patient_id = extract_case_id(pred_file.name)
         scan_id = patient_id.replace("patient", "scan")
 
         if patient_id in seen_ids:

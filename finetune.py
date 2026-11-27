@@ -166,7 +166,20 @@ def main(args):
             if key in collated_batch:
                 collated_batch[key] = collated_batch[key].as_tensor()
 
-        return cutmix_transform(collated_batch)
+        actual_bs = collated_batch["img"].shape[0]
+        if actual_bs == cutmix_batch_size:
+            return cutmix_transform(collated_batch)
+        if actual_bs > 1:
+            fallback_cutmix = CutMixd(
+                keys=["img"],
+                batch_size=actual_bs,
+                label_keys=None,
+                alpha=0.3,
+                allow_missing_keys=False,
+            )
+            fallback_cutmix.set_random_state(seed=(seed + actual_bs) % (2**32))
+            return fallback_cutmix(collated_batch)
+        return collated_batch
 
     worker_seed_fn = monai.data.worker_init_fn
     train_gen = torch.Generator().manual_seed(seed + 1)
@@ -204,7 +217,12 @@ def main(args):
         num_res_units=2,
     ).to(device)
 
-    if args.pretrained_path and os.path.exists(args.pretrained_path):
+    if args.pretrained_path and args.pretrained_path.lower() != "none":
+        if not os.path.exists(args.pretrained_path):
+            raise FileNotFoundError(
+                f"Pretrained checkpoint not found: {args.pretrained_path} "
+                "(pass --pretrained_path none to train from scratch)"
+            )
         model_dict = model.state_dict()
         state_dict = remap_legacy_state_dict(torch.load(args.pretrained_path, map_location=device))
         pretrained_dict = {
@@ -214,7 +232,7 @@ def main(args):
         print("Filtered mismatched keys:", filtered_keys)
         model.load_state_dict(pretrained_dict, strict=False)
     else:
-        print(f"Warning: pretrained_path not found ({args.pretrained_path}); training from scratch.")
+        print("No pretrained checkpoint specified; training from scratch.")
 
     loss_function = monai.losses.DiceFocalLoss(
         sigmoid=True, gamma=2.0, alpha=0.3, include_background=False
