@@ -9,14 +9,18 @@ Source code for **"LSA-ResUNet: Lightweight Spatial Attention Residual UNet with
 ```text
 LSA-ResUNet/
 ├── LSA.py                    # 3D LSA-ResUNet architecture (LSAResUNet, DRU, LSA module)
-├── pretrain.py               # Supervised 3D pretraining on DEEP-PSMA (PET+CT)
-├── finetune.py               # Fine-tuning on FAHSU-PSMA with Organ CutMix
-├── inference.py              # Sliding-window inference (supports single or multi-fold checkpoints)
+├── pretrain.py               # Supervised 3D pretraining
+├── finetune.py               # Fine-tuning with PET Organ CutMix
+├── inference.py              # Sliding-window inference (single or multi-fold checkpoints)
 ├── evaluation.py             # Voxel-level, lesion-level, and PET quantitative evaluation
+├── preprocessing/
+│   ├── 1_resample_and_clip_ct.py      # Align CT/masks to native PET grid & clip CT [-1000, 1000] HU
+│   ├── 2_crop_vesicoprostatic_roi.py  # Crop to bladder/prostate ROI with world-space margins
+│   └── 3_merge_organ_tumor_mask.py    # Exclude prostate, merge tumour mask, export flat NIfTIs
 ├── requirements.txt          # Tested Python package dependencies
 ├── LICENSE                   # Apache-2.0 License
 ├── assets/
-│   └── data_mask_overview.png    # Visual overview of input PET/CT, MERGED_MASK, and predictions
+│   └── data_mask_overview.png    # Visual overview of sample PET/CT, MERGED_MASK, and predictions
 ├── weights/
 │   └── lsa_resunet_finetuned.pth # Fine-tuned LSA-ResUNet checkpoint (~19 MB)
 └── demo_data/
@@ -35,7 +39,7 @@ pip install -r requirements.txt
 
 ---
 
-## 3. Quick-Start Demo (Out-of-the-Box)
+## 3. Quick-Start Demo
 
 Two public test cases, `sample1` with <sup>18</sup>F-PSMA and `sample2` with <sup>68</sup>Ga-PSMA, from the **TCIA PSMA-PET-CT-Lesions** collection are included in `./demo_data/TCIA_sample/` for immediate verification of inference and quantitative evaluation:
 
@@ -49,9 +53,9 @@ python evaluation.py --pred_dir ./outputs/demo_preds --gt_dir ./demo_data/TCIA_s
 
 **Expected Output Files**:
 
-`./outputs/demo_preds/sample1_PET_seg.nii.gz`, `./outputs/demo_preds/sample2_PET_seg.nii.gz` (binary 3D NIfTI masks preserving input PET affine/header).
+`./outputs/demo_preds/sample1_PET_seg.nii.gz` and `./outputs/demo_preds/sample2_PET_seg.nii.gz`, which are binary 3D NIfTI masks preserving the input PET affine and header.
 
-`./outputs/demo_metrics.csv` (21-column CSV report).
+`./outputs/demo_metrics.csv`, a 21-column CSV evaluation report.
 
 **Example Console Output**:
 
@@ -66,16 +70,48 @@ Total Evaluated: 2 cases | Mean DSC = 0.8453 ± 0.0058
 
 ---
 
-## 4. Data Structure & Mask Conventions
+## 4. Data Preparation & Preprocessing
 
-Datasets must be **pre-split into `train/`, `val/`, and `test/` subdirectories in advance** (the training scripts read these folders directly and do not perform internal dataset splitting). Within each split, paired 3D NIfTI volumes are matched strictly by `<case_id>` prefix:
+### Raw Input Format
+
+Before running preprocessing, prepare each scan in `.nii.gz` format under `<raw_dir>/<case_id>/` with `PET.nii.gz` converted to SUVbw, `CT.nii.gz` in Hounsfield Units, and `ORGAN_MASK.nii.gz` generated from CT using [TotalSegmentator](https://github.com/wasserth/TotalSegmentator) with `--ml`:
+
+```text
+raw_data/
+└── <case_id>/
+    ├── PET.nii.gz          # SUVbw PET image (defines native reference resolution)
+    ├── CT.nii.gz           # Raw CT volume in HU
+    ├── ORGAN_MASK.nii.gz   # TotalSegmentator multi-label organ mask
+    └── TTB.nii.gz          # Tumour ground-truth mask, required for training/evaluation only
+```
+
+### Preprocessing Pipeline
+
+Run the three scripts in `preprocessing/` strictly in order **1 → 2 → 3**:
+
+```bash
+# Step 1: Resample CT (linear) and masks (nearest-neighbour) to native PET grid, clip CT to [-1000, 1000] HU
+python preprocessing/1_resample_and_clip_ct.py --input_dir ./raw_data --output_dir ./step1_aligned
+
+# Step 2: Crop all aligned volumes around bladder/prostate (labels 21, 22) with (50,50), (50,50), (50,20) mm margins
+python preprocessing/2_crop_vesicoprostatic_roi.py --input_dir ./step1_aligned --output_dir ./step2_cropped
+
+# Step 3: Exclude prostate (label 22), merge tumour mask, and export flat NIfTI files
+python preprocessing/3_merge_organ_tumor_mask.py --input_dir ./step2_cropped --output_dir ./data/dataset/train
+```
+
+**Mask & Split Conventions**:
+
+In `MERGED_MASK`, `label == 0` denotes background and the excluded prostate region, `label == 1` denotes the ground-truth tumour overwriting overlapping organs directly voxel-by-voxel without morphological dilation, and `label > 1` retains the remaining pelvic organs and bones.
+
+Datasets must be **pre-split into `train/`, `val/`, and `test/` subdirectories in advance** (the training scripts read these folders directly and do not split datasets internally):
 
 ```text
 data/
-├── DEEP-PSMA/
+├── pretrain_data/
 │   ├── train/  (<case_id>_PET.nii.gz, <case_id>_CT.nii.gz, <case_id>_TTB.nii.gz)
 │   └── val/
-└── FAHSU-PSMA/
+└── finetune_data/
     ├── train/  (<case_id>_PET.nii.gz, <case_id>_CT.nii.gz, <case_id>_MERGED_MASK.nii.gz)
     ├── val/
     └── test/
@@ -87,32 +123,14 @@ data/
 
 *Representative axial slices from the two TCIA demo cases, `sample1` with <sup>18</sup>F-PSMA and `sample2` with <sup>68</sup>Ga-PSMA. **(A)** PSMA PET; **(B)** Registered CT; **(C)** Merged organ and tumour mask; **(D)** Ground-truth vs. single-model prediction, with `3D DSC` computed over the full volume.*
 
-### Mask & Augmentation Details
-
-**Organ & Tumour Mask Merging (`MERGED_MASK`)**:
-
-Organ masks (`OM`) are derived from CT using [TotalSegmentator](https://github.com/wasserth/TotalSegmentator), with the **prostate mask excluded** during preprocessing.
-
-Ground-truth tumour masks (`TM`, `label == 1`) take priority over overlapping pelvic organs, overwriting overlapping voxels **directly voxel-by-voxel without morphological dilation**.
-
-During fine-tuning, `RandCropByPosNegLabeld` samples `32×32×32` patches using `MERGED_MASK > 0` as foreground, while the loss and validation metrics evaluate strictly on `seg == 1` (tumour).
-
-**Organ CutMix (`finetune.py`)**:
-
-Applied via MONAI `CutMixd(keys=["img"], batch_size=64, alpha=0.3)` exclusively to the **PET** patches sampled using `MERGED_MASK`, while keeping paired **CT** volumes and **tumour masks (`seg`)** unaltered.
-
-**Seed Control**:
-
-Both `pretrain.py` and `finetune.py` support `--aug_mode fixed --seed <N>` (deterministic reproducibility) and `--aug_mode random` (random seed logged automatically to `run_info`).
-
 ---
 
 ## 5. Training, Inference & Evaluation
 
-### Pretraining (DEEP-PSMA)
+### Pretraining
 
 ```bash
-python pretrain.py --data_dir ./data/DEEP-PSMA --output_dir ./outputs/pretrain
+python pretrain.py --data_dir ./data/pretrain_data --output_dir ./outputs/pretrain
 ```
 
 Optional flags: `--aug_mode random` (or `fixed --seed 42`), `--epochs 400`, `--batch_size 2`, `--num_samples 128`, `--lr 1e-3`, `--gpu 0`.
@@ -125,10 +143,10 @@ Optional flags: `--aug_mode random` (or `fixed --seed 42`), `--epochs 400`, `--b
 
 `run_info_<timestamp>.txt` (random seed, `aug_mode`, hyperparameters, and run summary).
 
-### Fine-tuning (FAHSU-PSMA)
+### Fine-tuning
 
 ```bash
-python finetune.py --data_dir ./data/FAHSU-PSMA --pretrained_path ./outputs/pretrain/best_model_segmentation3d.pth --output_dir ./outputs/finetune
+python finetune.py --data_dir ./data/finetune_data --pretrained_path ./outputs/pretrain/best_model_segmentation3d.pth --output_dir ./outputs/finetune
 ```
 
 Optional flags: `--aug_mode fixed --seed 1076250484` (or `random`), `--epochs 400`, `--batch_size 2`, `--num_samples 32`, `--lr 1e-3`, `--gpu 0`.
@@ -141,29 +159,30 @@ Optional flags: `--aug_mode fixed --seed 1076250484` (or `random`), `--epochs 40
 
 `run_info.txt` (random seed, `aug_mode`, pretrained checkpoint path, and dataset counts).
 
-### Inference (Single Checkpoint or Optional Multi-Fold Ensemble)
+### Inference
 
 ```bash
 # Single checkpoint inference
-python inference.py --data_dir ./data/FAHSU-PSMA/test --weights ./weights/lsa_resunet_finetuned.pth --output_dir ./outputs/preds_local
+python inference.py --data_dir ./data/finetune_data/test --weights ./weights/lsa_resunet_finetuned.pth --output_dir ./outputs/preds
 
-# Optional: 5-fold ensemble inference (averages sigmoid probabilities across folds)
-python inference.py --data_dir ./data/TCIA/test --weights ./outputs/fold0.pth ./outputs/fold1.pth ./outputs/fold2.pth ./outputs/fold3.pth ./outputs/fold4.pth --output_dir ./outputs/preds_tcia_ensemble
+# Multi-fold ensemble inference (averages sigmoid probabilities across checkpoints)
+python inference.py --data_dir ./data/finetune_data/test --weights ./outputs/fold0.pth ./outputs/fold1.pth ./outputs/fold2.pth ./outputs/fold3.pth ./outputs/fold4.pth --output_dir ./outputs/preds_ensemble
 ```
 
-**Outputs** (saved in `--output_dir`, e.g., `./outputs/preds_local/`): `<case_id>_PET_seg.nii.gz` binary segmentation masks matching the input PET geometry.
+**Outputs** (saved in `--output_dir`, e.g., `./outputs/preds/`): `<case_id>_PET_seg.nii.gz` binary segmentation masks matching the input PET geometry.
 
-### Evaluation (Voxel-Level, Lesion-Level & PET Quantitative Biomarkers)
+### Evaluation
 
 ```bash
 # When *_PET.nii.gz and *_MERGED_MASK.nii.gz are in the same test directory:
-python evaluation.py --pred_dir ./outputs/preds_local --gt_dir ./data/FAHSU-PSMA/test --output_csv ./outputs/evaluation_metrics_local.csv
+python evaluation.py --pred_dir ./outputs/preds --gt_dir ./data/finetune_data/test --output_csv ./outputs/evaluation_metrics.csv
 
 # Or with separate --gt_dir and --pet_dir:
-python evaluation.py --pred_dir ./outputs/preds_tcia_ensemble --gt_dir ./data/TCIA/ground_truth --pet_dir ./data/TCIA/pet_images --output_csv ./outputs/evaluation_metrics_tcia.csv
+python evaluation.py --pred_dir ./outputs/preds --gt_dir ./data/ground_truth --pet_dir ./data/pet_images --output_csv ./outputs/evaluation_metrics.csv
 ```
 
-**Outputs**: Prints per-case and cohort summary statistics (Mean ± SD, Range, Median [IQR]) to the terminal and saves the 21-column CSV table to `--output_csv` (e.g., `./outputs/evaluation_metrics_local.csv`).
+**Outputs**: Prints per-case and cohort summary statistics (Mean ± SD, Range, Median [IQR]) to the terminal and saves the 21-column CSV table to `--output_csv` (e.g., `./outputs/evaluation_metrics.csv`).
+
 **Evaluation Criteria & Exported CSV (21 Columns)**:
 
 **Lesion Counts & Matrix**: `Scan_ID`, `Pred_Lesions`, `GT_Lesions`, `Lesion_TP`, `Lesion_FP`, `Lesion_FN` (3D 6-connected components; a lesion is a true positive if overlap ≥ 10% of the GT lesion volume **and** the predicted lesion covers the GT lesion's SUV<sub>max</sub> peak voxel).
@@ -184,4 +203,4 @@ python evaluation.py --pred_dir ./outputs/preds_tcia_ensemble --gt_dir ./data/TC
 
 **DEEP-PSMA**: Challenge dataset ([https://deep-psma.grand-challenge.org/](https://deep-psma.grand-challenge.org/)).
 
-**FAHSU-PSMA**: Institutional clinical cohort; de-identified data are available from the corresponding author upon reasonable academic request and ethics approval.
+**FAHSU-PSMA**: Institutional clinical cohort; available from the corresponding author upon reasonable request.
