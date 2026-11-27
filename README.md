@@ -93,7 +93,7 @@ data/
 
 Organ masks (`OM`) are derived from CT using [TotalSegmentator](https://github.com/wasserth/TotalSegmentator), with the **prostate mask excluded** during preprocessing.
 
-Ground-truth tumour masks (`TM`, `label == 1`) take priority over overlapping pelvic organs (including the urinary bladder, `label == 2`, and pelvic bones/structures, `label > 2`), overwriting overlapping voxels **directly voxel-by-voxel without morphological dilation**.
+Ground-truth tumour masks (`TM`, `label == 1`) take priority over overlapping pelvic organs, overwriting overlapping voxels **directly voxel-by-voxel without morphological dilation**.
 
 During fine-tuning, `RandCropByPosNegLabeld` samples `32×32×32` patches using `MERGED_MASK > 0` as foreground, while the loss and validation metrics evaluate strictly on `seg == 1` (tumour).
 
