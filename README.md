@@ -1,6 +1,6 @@
 # LSA-ResUNet
 
-Source code for **"LSA-ResUNet: Lightweight Spatial Attention Residual UNet with Transfer Learning for Multicenter PSMA PET/CT Prostate Tumor Segmentation"** (implemented with PyTorch and MONAI).
+Source code for **"LSA-ResUNet: Lightweight Spatial Attention Residual UNet with Transfer Learning for Multicenter PSMA PET/CT Prostate Tumor Segmentation"**, implemented with PyTorch and MONAI.
 
 ---
 
@@ -31,7 +31,7 @@ LSA-ResUNet/
 
 ## 2. Environment Setup
 
-Tested with Python 3.10 and CUDA-enabled PyTorch (please install a CUDA-compatible `torch` matching your GPU driver first if on Windows):
+Tested with Python 3.10 and CUDA-enabled PyTorch; please install a CUDA-compatible `torch` matching your GPU driver first if on Windows:
 
 ```bash
 pip install -r requirements.txt
@@ -104,7 +104,7 @@ python preprocessing/3_merge_organ_tumor_mask.py --input_dir ./step2_cropped --o
 
 In `MERGED_MASK`, `label == 0` denotes background and the excluded prostate region, `label == 1` denotes the ground-truth tumour overwriting overlapping organs directly voxel-by-voxel without morphological dilation, and `label > 1` retains the remaining pelvic organs and bones.
 
-Datasets must be **pre-split into `train/`, `val/`, and `test/` subdirectories in advance** (the training scripts read these folders directly and do not split datasets internally):
+Datasets must be **pre-split into `train/`, `val/`, and `test/` subdirectories in advance**, as the training scripts read these folders directly without internal splitting:
 
 ```text
 data/
@@ -133,15 +133,15 @@ data/
 python pretrain.py --data_dir ./data/pretrain_data --output_dir ./outputs/pretrain
 ```
 
-Optional flags: `--aug_mode random` or `--aug_mode fixed --seed <N>` (supports random or fixed seed mode), `--epochs 400`, `--batch_size 2`, `--num_samples 128`, `--lr 1e-3`, `--gpu 0`.
+Optional flags: `--aug_mode random` or `--aug_mode fixed --seed <N>` for random or fixed seed mode, `--epochs 400`, `--batch_size 2`, `--num_samples 128`, `--lr 1e-3`, `--gpu 0`.
 
-**Outputs** (saved in `./outputs/pretrain/`):
+**Outputs** saved in `./outputs/pretrain/`:
 
-`best_model_segmentation3d.pth` (best validation DSC checkpoint).
+`best_model_segmentation3d.pth`: best validation DSC checkpoint.
 
-`train_log_<timestamp>.txt` (epoch loss and validation DSC every 2 epochs).
+`train_log_<timestamp>.txt`: epoch loss and validation DSC every 2 epochs.
 
-`run_info_<timestamp>.txt` (random seed, `aug_mode`, hyperparameters, and run summary).
+`run_info_<timestamp>.txt`: random seed, `aug_mode`, hyperparameters, and run summary.
 
 ### Fine-tuning
 
@@ -149,15 +149,15 @@ Optional flags: `--aug_mode random` or `--aug_mode fixed --seed <N>` (supports r
 python finetune.py --data_dir ./data/finetune_data --pretrained_path ./outputs/pretrain/best_model_segmentation3d.pth --output_dir ./outputs/finetune
 ```
 
-Optional flags: `--aug_mode fixed --seed <N>` or `--aug_mode random` (supports fixed or random seed mode), `--epochs 400`, `--batch_size 2`, `--num_samples 32`, `--lr 1e-3`, `--gpu 0`.
+Optional flags: `--aug_mode fixed --seed <N>` or `--aug_mode random` for fixed or random seed mode, `--epochs 400`, `--batch_size 2`, `--num_samples 32`, `--lr 1e-3`, `--gpu 0`.
 
-**Outputs** (saved in `./outputs/finetune/`):
+**Outputs** saved in `./outputs/finetune/`:
 
-`best_metric_model_segmentation3d_dict.pth` (best validation DSC checkpoint).
+`best_metric_model_segmentation3d_dict.pth`: best validation DSC checkpoint.
 
-`train_log.txt` (step/epoch training loss and validation DSC every 2 epochs).
+`train_log.txt`: step/epoch training loss and validation DSC every 2 epochs.
 
-`run_info.txt` (random seed, `aug_mode`, pretrained checkpoint path, and dataset counts).
+`run_info.txt`: random seed, `aug_mode`, pretrained checkpoint path, and dataset counts.
 
 ### Inference
 
@@ -169,7 +169,7 @@ python inference.py --data_dir ./data/finetune_data/test --weights ./weights/lsa
 python inference.py --data_dir ./data/finetune_data/test --weights ./outputs/fold0.pth ./outputs/fold1.pth ./outputs/fold2.pth ./outputs/fold3.pth ./outputs/fold4.pth --output_dir ./outputs/preds_ensemble
 ```
 
-**Outputs** (saved in `--output_dir`, e.g., `./outputs/preds/`): `<case_id>_PET_seg.nii.gz` binary segmentation masks matching the input PET geometry.
+**Outputs** saved in `--output_dir`, e.g., `./outputs/preds/`: `<case_id>_PET_seg.nii.gz` binary segmentation masks matching the input PET geometry.
 
 ### Evaluation
 
@@ -181,11 +181,11 @@ python evaluation.py --pred_dir ./outputs/preds --gt_dir ./data/finetune_data/te
 python evaluation.py --pred_dir ./outputs/preds --gt_dir ./data/ground_truth --pet_dir ./data/pet_images --output_csv ./outputs/evaluation_metrics.csv
 ```
 
-**Outputs**: Prints per-case and cohort summary statistics (Mean ± SD, Range, Median [IQR]) to the terminal and saves the 21-column CSV table to `--output_csv` (e.g., `./outputs/evaluation_metrics.csv`).
+**Outputs**: Prints per-case and cohort summary statistics — Mean ± SD, Range, Median and IQR — to the terminal and saves the 21-column CSV table to `--output_csv`, e.g., `./outputs/evaluation_metrics.csv`.
 
-**Evaluation Criteria & Exported CSV (21 Columns)**:
+**Evaluation Criteria & Exported CSV — 21 Columns**:
 
-**Lesion Counts & Matrix**: `Scan_ID`, `Pred_Lesions`, `GT_Lesions`, `Lesion_TP`, `Lesion_FP`, `Lesion_FN` (3D 6-connected components; a lesion is a true positive if overlap ≥ 10% of the GT lesion volume **and** the predicted lesion covers the GT lesion's SUV<sub>max</sub> peak voxel).
+**Lesion Counts & Matrix**: `Scan_ID`, `Pred_Lesions`, `GT_Lesions`, `Lesion_TP`, `Lesion_FP`, `Lesion_FN` — 3D 6-connected components; a lesion is a true positive if overlap ≥ 10% of the GT lesion volume **and** the predicted lesion covers the GT lesion's SUV<sub>max</sub> peak voxel.
 
 **Voxel-Level Metrics**: `DSC`, `Voxel_PPV`, `Voxel_Sensitivity`.
 
@@ -199,8 +199,8 @@ python evaluation.py --pred_dir ./outputs/preds --gt_dir ./data/ground_truth --p
 
 **Code License**: Released under the [Apache-2.0 License](./LICENSE).
 
-**TCIA PSMA-PET-CT-Lesions** (including the 2 sample cases in `./demo_data/TCIA_sample/`): Publicly available on The Cancer Imaging Archive ([https://www.cancerimagingarchive.net/collection/psma-pet-ct-lesions/](https://www.cancerimagingarchive.net/collection/psma-pet-ct-lesions/)) under CC BY 4.0.
+**TCIA PSMA-PET-CT-Lesions**, including the 2 sample cases in `./demo_data/TCIA_sample/`: Publicly available on The Cancer Imaging Archive at [https://www.cancerimagingarchive.net/collection/psma-pet-ct-lesions/](https://www.cancerimagingarchive.net/collection/psma-pet-ct-lesions/) under CC BY 4.0.
 
-**DEEP-PSMA**: Challenge dataset ([https://deep-psma.grand-challenge.org/](https://deep-psma.grand-challenge.org/)).
+**DEEP-PSMA**: Challenge dataset at [https://deep-psma.grand-challenge.org/](https://deep-psma.grand-challenge.org/).
 
 **FAHSU-PSMA**: Institutional clinical cohort; available from the corresponding author upon reasonable request.
