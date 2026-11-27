@@ -14,9 +14,9 @@ LSA-ResUNet/
 ├── inference.py              # Sliding-window inference (single or multi-fold checkpoints)
 ├── evaluation.py             # Voxel-level, lesion-level, and PET quantitative evaluation
 ├── preprocessing/
-│   ├── 1_resample_and_clip_ct.py      # Align CT/masks to native PET grid & clip CT [-1000, 1000] HU
-│   ├── 2_crop_vesicoprostatic_roi.py  # Crop to bladder/prostate ROI with world-space margins
-│   └── 3_merge_organ_tumor_mask.py    # Exclude prostate, merge tumour mask, export flat NIfTIs
+│   ├── 1_resample_and_clip_ct.py      # Downsample CT/masks to native PET resolution & clip CT [-1000, 1000] HU
+│   ├── 2_crop_vesicoprostatic_roi.py  # Crop to target region using bladder/prostate masks
+│   └── 3_merge_organ_tumor_mask.py    # Exclude prostate, merge tumour mask, save as <case_id>_*.nii.gz
 ├── requirements.txt          # Tested Python package dependencies
 ├── LICENSE                   # Apache-2.0 License
 ├── assets/
@@ -51,11 +51,11 @@ python inference.py --data_dir ./demo_data/TCIA_sample --weights ./weights/lsa_r
 python evaluation.py --pred_dir ./outputs/demo_preds --gt_dir ./demo_data/TCIA_sample --output_csv ./outputs/demo_metrics.csv
 ```
 
-**Expected Output Files**:
+**Output Locations & Files**:
 
-`./outputs/demo_preds/sample1_PET_seg.nii.gz` and `./outputs/demo_preds/sample2_PET_seg.nii.gz`, which are binary 3D NIfTI masks preserving the input PET affine and header.
+After running the first inference command, the output directory `./outputs/demo_preds/` is created automatically and stores two predicted binary 3D NIfTI segmentation masks, `sample1_PET_seg.nii.gz` and `sample2_PET_seg.nii.gz`, preserving the spatial affine and header of the input PET images.
 
-`./outputs/demo_metrics.csv`, a 21-column CSV evaluation report.
+After running the second evaluation command, per-case and cohort summary metrics are printed directly to the terminal, and the complete 21-column evaluation table is saved to `./outputs/demo_metrics.csv`.
 
 **Example Console Output**:
 
@@ -90,13 +90,13 @@ raw_data/
 Run the three scripts in `preprocessing/` strictly in order **1 → 2 → 3**:
 
 ```bash
-# Step 1: Resample CT (linear) and masks (nearest-neighbour) to native PET grid, clip CT to [-1000, 1000] HU
-python preprocessing/1_resample_and_clip_ct.py --input_dir ./raw_data --output_dir ./step1_aligned
+# Step 1: Downsample CT (linear) and masks (nearest-neighbour) to native PET resolution, clip CT to [-1000, 1000] HU
+python preprocessing/1_resample_and_clip_ct.py --input_dir ./raw_data --output_dir ./step1_downsampled
 
-# Step 2: Crop all aligned volumes around bladder/prostate (labels 21, 22) with (50,50), (50,50), (50,20) mm margins
-python preprocessing/2_crop_vesicoprostatic_roi.py --input_dir ./step1_aligned --output_dir ./step2_cropped
+# Step 2: Crop to target region based on bladder and prostate masks (labels 21, 22)
+python preprocessing/2_crop_vesicoprostatic_roi.py --input_dir ./step1_downsampled --output_dir ./step2_cropped
 
-# Step 3: Exclude prostate (label 22), merge tumour mask, and export flat NIfTI files
+# Step 3: Exclude prostate mask (label 22), merge tumour mask, and save as <case_id>_*.nii.gz
 python preprocessing/3_merge_organ_tumor_mask.py --input_dir ./step2_cropped --output_dir ./data/dataset/train
 ```
 
@@ -133,7 +133,7 @@ data/
 python pretrain.py --data_dir ./data/pretrain_data --output_dir ./outputs/pretrain
 ```
 
-Optional flags: `--aug_mode random` (or `fixed --seed 42`), `--epochs 400`, `--batch_size 2`, `--num_samples 128`, `--lr 1e-3`, `--gpu 0`.
+Optional flags: `--aug_mode random` or `--aug_mode fixed --seed <N>` (supports random or fixed seed mode), `--epochs 400`, `--batch_size 2`, `--num_samples 128`, `--lr 1e-3`, `--gpu 0`.
 
 **Outputs** (saved in `./outputs/pretrain/`):
 
@@ -149,7 +149,7 @@ Optional flags: `--aug_mode random` (or `fixed --seed 42`), `--epochs 400`, `--b
 python finetune.py --data_dir ./data/finetune_data --pretrained_path ./outputs/pretrain/best_model_segmentation3d.pth --output_dir ./outputs/finetune
 ```
 
-Optional flags: `--aug_mode fixed --seed 1076250484` (or `random`), `--epochs 400`, `--batch_size 2`, `--num_samples 32`, `--lr 1e-3`, `--gpu 0`.
+Optional flags: `--aug_mode fixed --seed <N>` or `--aug_mode random` (supports fixed or random seed mode), `--epochs 400`, `--batch_size 2`, `--num_samples 32`, `--lr 1e-3`, `--gpu 0`.
 
 **Outputs** (saved in `./outputs/finetune/`):
 

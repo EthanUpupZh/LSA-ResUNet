@@ -1,4 +1,4 @@
-"""Step 3: Exclude prostate from ORGAN_MASK, merge TTB tumour mask, and export flat NIfTI files.
+"""Step 3: Exclude prostate from ORGAN_MASK, merge TTB tumour mask, and save as <case_id>_*.nii.gz.
 
 Expected input directory (from Step 2):
     <input_dir>/<case_id>/PET.nii.gz, CT.nii.gz, ORGAN_MASK.nii.gz, [TTB.nii.gz]

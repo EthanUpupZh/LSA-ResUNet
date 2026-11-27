@@ -1,9 +1,9 @@
-"""Step 2: Crop PET, CT, ORGAN_MASK, and optional TTB to the vesicoprostatic ROI.
+"""Step 2: Crop PET, CT, ORGAN_MASK, and optional TTB to the target region.
 
 Computes the 3D world-coordinate bounding box from bladder/prostate labels
 in ORGAN_MASK.nii.gz (default TotalSegmentator labels: 21=urinary_bladder, 22=prostate),
 expands it by (50, 50) mm along X, (50, 50) mm along Y, and (50, 20) mm along Z,
-and crops all aligned volumes while preserving native spacing and updating the NIfTI affine.
+and crops all volumes to the target region while preserving native spacing and updating the NIfTI affine.
 """
 
 import argparse

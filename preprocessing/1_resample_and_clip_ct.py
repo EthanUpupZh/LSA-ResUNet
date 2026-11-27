@@ -1,15 +1,15 @@
-"""Step 1: Resample CT, ORGAN_MASK, and optional TTB to native PET space and clip CT HU to [-1000, 1000].
+"""Step 1: Downsample CT, ORGAN_MASK, and optional TTB to native PET resolution and clip CT HU to [-1000, 1000].
 
 Expected input directory structure:
     <input_dir>/<case_id>/
-        PET.nii.gz         (SUVbw map, defines the reference spatial grid)
+        PET.nii.gz         (SUVbw map, defines the native PET reference grid)
         CT.nii.gz          (CT volume in Hounsfield Units)
         ORGAN_MASK.nii.gz  (TotalSegmentator --ml output)
         TTB.nii.gz         (optional ground-truth tumour mask, label == 1)
 
 Outputs in <output_dir>/<case_id>/:
-    PET.nii.gz, CT.nii.gz (clipped to [-1000, 1000] HU and aligned to PET),
-    ORGAN_MASK.nii.gz (nearest-neighbour aligned to PET), and TTB.nii.gz (if provided).
+    PET.nii.gz, CT.nii.gz (clipped to [-1000, 1000] HU and downsampled to PET resolution),
+    ORGAN_MASK.nii.gz (nearest-neighbour downsampled to PET resolution), and TTB.nii.gz (if provided).
 """
 
 import argparse
@@ -56,7 +56,7 @@ def process_case(case_dir: Path, out_case_dir: Path, min_hu: float, max_hu: floa
         ttb_aligned = resample_to_reference(ttb_sitk, pet_sitk, is_label=True)
         sitk.WriteImage(ttb_aligned, str(out_case_dir / "TTB.nii.gz"))
 
-    print(f"[OK] {case_dir.name}: aligned to PET grid {pet_sitk.GetSize()}, CT clipped to [{min_hu}, {max_hu}] HU")
+    print(f"[OK] {case_dir.name}: downsampled to PET grid {pet_sitk.GetSize()}, CT clipped to [{min_hu}, {max_hu}] HU")
     return True
 
 
