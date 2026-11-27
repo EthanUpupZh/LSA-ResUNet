@@ -149,7 +149,7 @@ data/
 python pretrain.py --data_dir ./data/pretrain_data --output_dir ./outputs/pretrain
 ```
 
-Optional flags: `--aug_mode random` or `--aug_mode fixed --seed <N>` for random or fixed seed mode, `--epochs 400`, `--batch_size 2`, `--num_samples 128`, `--lr 1e-3`, `--gpu 0`.
+**Default Parameters**: When no extra arguments are specified, `pretrain.py` runs with the exact hyperparameters reported in the paper — `epochs = 400`, `val_interval = 2`, `batch_size = 2`, `num_samples = 128`, `lr = 1e-3`, and `aug_mode = random`, while also supporting `fixed` seed mode. All parameters can be adjusted directly in `pretrain.py` or via command-line arguments according to your own dataset characteristics.
 
 **Outputs** saved in `./outputs/pretrain/`:
 
@@ -165,7 +165,7 @@ Optional flags: `--aug_mode random` or `--aug_mode fixed --seed <N>` for random 
 python finetune.py --data_dir ./data/finetune_data --pretrained_path ./outputs/pretrain/best_model_segmentation3d.pth --output_dir ./outputs/finetune
 ```
 
-Optional flags: `--aug_mode fixed --seed <N>` or `--aug_mode random` for fixed or random seed mode, `--epochs 400`, `--batch_size 2`, `--num_samples 32`, `--lr 1e-3`, `--gpu 0`.
+**Default Parameters**: When no extra arguments are specified, `finetune.py` runs with the exact hyperparameters reported in the paper — `epochs = 400`, `val_interval = 2`, `batch_size = 2`, `num_samples = 32`, `lr = 1e-3`, and `aug_mode = fixed`, while also supporting `random` seed mode. All parameters can be adjusted directly in `finetune.py` or via command-line arguments according to your own dataset characteristics.
 
 **Outputs** saved in `./outputs/finetune/`:
 
@@ -211,7 +211,19 @@ python evaluation.py --pred_dir ./outputs/preds --gt_dir ./data/ground_truth --p
 
 ---
 
-## 6. Released Checkpoint & Data Availability
+## 6. Comparison Models
+
+For the baseline and state-of-the-art comparison models evaluated in the manuscript, please refer to their official implementations:
+
+**3D ResUNet, Attention U-Net, and Swin UNETR**: Implemented using the official MONAI framework at [https://github.com/Project-MONAI/MONAI](https://github.com/Project-MONAI/MONAI) with the same preprocessing and training/evaluation pipeline.
+
+**nnU-Net**: Official implementation at [https://github.com/MIC-DKFZ/nnUNet](https://github.com/MIC-DKFZ/nnUNet).
+
+**SegMamba-V2**: Official implementation at [https://github.com/ge-xing/SegMamba](https://github.com/ge-xing/SegMamba) and [https://arxiv.org/abs/2401.13560](https://arxiv.org/abs/2401.13560).
+
+---
+
+## 7. Released Checkpoint & Data Availability
 
 **Released Checkpoint**: `./weights/best_metric_model_segmentation3d_dict.pth` was obtained by supervised pretraining of `LSAResUNet` on DEEP-PSMA, followed by fine-tuning on FAHSU-PSMA using PET Organ CutMix and `DiceFocalLoss`, retaining the checkpoint with the highest validation DSC.
 
